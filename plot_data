@@ -1,0 +1,120 @@
+#!/usr/bin/python3
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+#choose plot for ui or raspberry
+UI = 0
+
+#choose which type to plot
+VALID = 1
+BASE  = 0
+DIFF  = 0
+
+# -*- coding: utf-8 -*- 
+CSV_FILE_PATH = 'data_record.csv'
+data = pd.read_csv(CSV_FILE_PATH)
+#valid = data.iloc[:,[1,5]]
+#valid1 = data['valid1']
+
+if UI:
+	valid = np.array(data.loc[:,['VALID_CH0','VALID_CH1','VALID_CH2','VALID_CH3','VALID_CH4','VALID_CH5']])
+	base = np.array(data.loc[:,['BASELINE_CH0','BASELINE_CH1','BASELINE_CH2','BASELINE_CH3','BASELINE_CH4','BASELINE_CH5']])
+	diff = np.array(data.loc[:,['DIFF0','DIFF1','DIFF2','DIFF3','DIFF4','DIFF5']])
+else:
+	valid = np.array(data.loc[:,['valid0','valid1','valid2','valid3','valid4','valid5']])
+	base = np.array(data.loc[:,['base0','base1','base2','base3','base4','valid5']])
+	diff = np.array(data.loc[:,['diff0','diff1','diff2','diff3','diff4','diff5']])
+#print(valid[:,0])
+
+def data_format(valid):
+	valid_new = []
+	for i in range(len(valid)-1):
+		valid[i] = int(valid[i],16)
+		if valid[i] < 2**31:
+			valid[i] = valid[i]/1024 
+		else:
+			valid[i] = (valid[i]-2**32)/1024 
+		valid_new.append(valid[i])
+	return np.array(valid_new)
+
+
+valid0 = data_format(valid[:,0])
+valid1 = data_format(valid[:,1])
+valid2 = data_format(valid[:,2])
+valid3 = data_format(valid[:,3])
+valid4 = data_format(valid[:,4])
+valid5 = data_format(valid[:,5])
+
+base0 = data_format(base[:,0])
+base1 = data_format(base[:,1])
+base2 = data_format(base[:,2])
+base3 = data_format(base[:,3])
+base4 = data_format(base[:,4])
+base5 = data_format(base[:,5])
+
+diff0 = data_format(diff[:,0])
+diff1 = data_format(diff[:,1])
+diff2 = data_format(diff[:,2])
+diff3 = data_format(diff[:,3])
+diff4 = data_format(diff[:,4])
+diff5 = data_format(diff[:,5])
+# -----------------------------------------------------
+# plot data
+# -----------------------------------------------------
+# plt.rcParams['font.sans-serif']=['SimHei']
+# plt.rcParams['axes.unicode_minus'] = False
+# #matplotlib画图中中文显示会有问题，需要这两行设置默认字体
+print("The data is processing ...")
+
+colors1 = '#00CED1' #点的颜色
+colors2 = '#DC143C'
+################################################################
+# Figuer 1
+################################################################
+if VALID:
+	plt.figure('Validdata of CH0~Ch5')
+	plt.plot(valid0, '-o') 
+	plt.plot(valid1, '-o') 
+	plt.plot(valid2, '-o') 
+	plt.plot(valid3, '-o') 
+	plt.plot(valid4, '-o') 
+	plt.plot(valid5, '-o') 
+	plt.legend(['valid0','valid1','valid2','valid3','valid4','valid5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# Figuer 2
+################################################################
+if DIFF:
+	plt.figure('Diffdata of CH0~Ch5')
+	plt.plot(diff0, '-o') 
+	plt.plot(diff1, '-o') 
+	plt.plot(diff2, '-o') 
+	plt.plot(diff3, '-o') 
+	plt.plot(diff4, '-o') 
+	plt.plot(diff5, '-o') 
+	plt.legend(['diff0','diff1','diff2','diff3','diff4','diff5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# Figuer 3
+################################################################
+if BASE:
+	plt.figure('Baseline of CH0~Ch5')
+	plt.plot(base0, '-o') 
+	plt.plot(base1, '-o') 
+	plt.plot(base2, '-o') 
+	plt.plot(base3, '-o') 
+	plt.plot(base4, '-o') 
+	plt.plot(base5, '-o') 
+	plt.legend(['base0','base1','base2','base3','base4','base5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# show the plot figure
+################################################################
+plt.show()

@@ -1,0 +1,227 @@
+#!/usr/bin/python3
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+#choose plot for ui or raspberry
+UI = 0
+
+#choose which type to plot
+VALID = 0
+BASE  = 0
+DIFF  = 1
+
+#define the th
+TH1_prox = 20000 
+TH2_prox = 20000 
+TH3_prox = 20000 
+TH_Click = 20 
+click_interval = 20
+
+# -*- coding: utf-8 -*- 
+CSV_FILE_PATH = 'data_record.csv'
+data = pd.read_csv(CSV_FILE_PATH)
+#valid = data.iloc[:,[1,5]]
+#valid1 = data['valid1']
+
+if UI:
+	valid = np.array(data.loc[:,['VALID_CH0','VALID_CH1','VALID_CH2','VALID_CH3','VALID_CH4','VALID_CH5']])
+	base = np.array(data.loc[:,['BASELINE_CH0','BASELINE_CH1','BASELINE_CH2','BASELINE_CH3','BASELINE_CH4','BASELINE_CH5']])
+	diff = np.array(data.loc[:,['DIFF0','DIFF1','DIFF2','DIFF3','DIFF4','DIFF5']])
+else:
+	valid = np.array(data.loc[:,['valid0','valid1','valid2','valid3','valid4','valid5']])
+	base = np.array(data.loc[:,['base0','base1','base2','base3','base4','valid5']])
+	diff = np.array(data.loc[:,['diff0','diff1','diff2','diff3','diff4','diff5']])
+#print(valid[:,0])
+
+def data_format(valid):
+	valid_new = []
+	for i in range(len(valid)-1):
+		valid[i] = int(valid[i],16)
+		if valid[i] < 2**31:
+			valid[i] = valid[i]/1024 
+		else:
+			valid[i] = (valid[i]-2**32)/1024 
+		valid_new.append(valid[i])
+	return np.array(valid_new)
+
+
+def slider_detect(data1,data2,data3):
+	coord = []
+	coordinate = 0
+	flag = 0
+	d1 = 0;d2 = 0;d3 = 0
+	#a = [];b = [];c = [];sum = []
+
+	for i in range(len(data1)):
+		if data1[i] >= TH1_prox or data2[i] >= TH2_prox or data3[i] >= TH3_prox:
+			d1 = data1[i] - TH1_prox
+			d2 = data2[i] - TH2_prox
+			d3 = data3[i] - TH3_prox
+			if d1 < 0:
+				d1 = 0
+			if d2 < 0:
+				d2 = 0
+			if d3 < 0:
+				d3 = 0
+			coordinate = (0 * d1 + 1 * d2 + 2 * d3) / (d1 + d2 + d3)
+			print(coordinate)
+			coord.append(coordinate)
+			#sum.append(d1+d2+d3);a.append(d1/(d1+d2+d3));b.append(d2/(d1+d2+d3));c.append(d3/(d1+d2+d3))
+			flag = 1
+		else:
+			if flag:
+				flag = 0
+				move_distance = np.max(coord) - np.min(coord)
+				print(move_distance)
+				if move_distance > 0.5:
+					print("Slide Detected !!! The Moved Distance : %f " %(move_distance))
+				else:
+					print("One Prox But Not Slide!!!")
+				plt.figure('coordinate of slide')
+				plt.plot(coord, '-o') 
+				plt.legend(['coordinate'])
+				plt.ylabel('Value')
+				plt.xlabel('Sample (N)')
+				plt.grid()
+
+				#plt.figure('sum of slide')
+				#plt.plot(sum, '-o') 
+				#plt.legend(['sum'])
+				#plt.ylabel('Value')
+				#plt.xlabel('Sample (N)')
+				#plt.grid()
+
+				#plt.figure('weigh of slide')
+				#plt.plot(a,'-o') 
+				#plt.plot(b,'-o') 
+				#plt.plot(c,'-o') 
+				#plt.legend(['d1/sum','d2/sum','d3/sum'])
+				#plt.ylabel('Value')
+				#plt.xlabel('Sample (N)')
+				#plt.grid()
+
+
+def click_detect(data1,data2,data3):
+	deb_prox = 0
+	deb_far = 0
+	flag = 0
+	click_event = 0
+
+	for i in range(len(data1)):
+		if data1[i] >= TH1_prox or data2[i] >= TH2_prox or data3[i] >= TH3_prox:
+			deb_far = 0
+			deb_prox = deb_prox + 1
+			flag = 1
+		else:
+			deb_far = deb_far + 1
+
+			# if the prox_time < TH_click,means a click event!
+			#tell single click at the click_interval time after drop prox
+			#tell double click when drop prox
+			if flag:
+				flag = 0
+				print("The Click Time : %f " %(deb_prox))
+				if deb_prox < TH_Click and click_event == 0:
+					click_event = 1
+				elif deb_prox < TH_Click and click_event == 1:
+					click_event = 0
+					print("Double Click Detected !!!")
+			else:
+				deb_prox = 0
+				if deb_far == click_interval and click_event == 1:
+					click_event = 0
+					print("Single Click Detected !!!")
+
+
+
+
+valid0 = data_format(valid[:,0])
+valid1 = data_format(valid[:,1])
+valid2 = data_format(valid[:,2])
+valid3 = data_format(valid[:,3])
+valid4 = data_format(valid[:,4])
+valid5 = data_format(valid[:,5])
+
+base0 = data_format(base[:,0])
+base1 = data_format(base[:,1])
+base2 = data_format(base[:,2])
+base3 = data_format(base[:,3])
+base4 = data_format(base[:,4])
+base5 = data_format(base[:,5])
+
+diff0 = data_format(diff[:,0])
+diff1 = data_format(diff[:,1])
+diff2 = data_format(diff[:,2])
+diff3 = data_format(diff[:,3])
+diff4 = data_format(diff[:,4])
+diff5 = data_format(diff[:,5])
+
+# -----------------------------------------------------
+# calculate the centre of diff
+# -----------------------------------------------------
+print("the detect results of slide")
+slider_detect(diff1,diff4,diff0)
+
+#print("\n\nthe detect results of click")
+#click_detect(diff1,diff4,diff0)
+
+# -----------------------------------------------------
+# plot data
+# -----------------------------------------------------
+# plt.rcParams['font.sans-serif']=['SimHei']
+# plt.rcParams['axes.unicode_minus'] = False
+# #matplotlib画图中中文显示会有问题，需要这两行设置默认字体
+print("The data is processing ...")
+
+colors1 = '#00CED1' #点的颜色
+colors2 = '#DC143C'
+################################################################
+# Figuer 1
+################################################################
+if VALID:
+	plt.figure('Validdata of CH0~Ch5')
+	plt.plot(valid0, '-o') 
+	plt.plot(valid1, '-o') 
+	plt.plot(valid2, '-o') 
+	plt.plot(valid3, '-o') 
+	plt.plot(valid4, '-o') 
+	plt.plot(valid5, '-o') 
+	plt.legend(['valid0','valid1','valid2','valid3','valid4','valid5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# Figuer 2
+################################################################
+if DIFF:
+	plt.figure('Diffdata of CH0~Ch5')
+	plt.plot(diff0, '-o') 
+	plt.plot(diff1, '-o') 
+	plt.plot(diff2, '-o') 
+	plt.plot(diff3, '-o') 
+	plt.plot(diff4, '-o') 
+	plt.plot(diff5, '-o') 
+	plt.legend(['diff0','diff1','diff2','diff3','diff4','diff5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# Figuer 3
+################################################################
+if BASE:
+	plt.figure('Baseline of CH0~Ch5')
+	plt.plot(base0, '-o') 
+	plt.plot(base1, '-o') 
+	plt.plot(base2, '-o') 
+	plt.plot(base3, '-o') 
+	plt.plot(base4, '-o') 
+	plt.plot(base5, '-o') 
+	plt.legend(['base0','base1','base2','base3','base4','base5'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+################################################################
+# show the plot figure
+################################################################
+plt.show()

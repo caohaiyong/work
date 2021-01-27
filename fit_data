@@ -1,0 +1,113 @@
+#!/usr/bin/python3
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+#choose plot for ui or raspberry
+UI = 0
+
+#choose which type to plot
+VALID = 1
+BASE  = 0
+DIFF  = 0
+
+# -*- coding: utf-8 -*- 
+CSV_FILE_PATH = 'data_record.csv'
+data = pd.read_csv(CSV_FILE_PATH)
+#valid = data.iloc[:,[1,5]]
+#valid1 = data['valid1']
+
+if UI:
+	valid = np.array(data.loc[:,['VALID_CH0','VALID_CH1','VALID_CH2','VALID_CH3','VALID_CH4','VALID_CH5']])
+	base = np.array(data.loc[:,['BASELINE_CH0','BASELINE_CH1','BASELINE_CH2','BASELINE_CH3','BASELINE_CH4','BASELINE_CH5']])
+	diff = np.array(data.loc[:,['DIFF0','DIFF1','DIFF2','DIFF3','DIFF4','DIFF5']])
+else:
+	valid = np.array(data.loc[:,['valid0','valid1','valid2','valid3','valid4','valid5']])
+	base = np.array(data.loc[:,['base0','base1','base2','base3','base4','base5']])
+	diff = np.array(data.loc[:,['diff0','diff1','diff2','diff3','diff4','diff5']])
+#print(valid[:,0])
+
+def data_format(valid):
+	valid_new = []
+	for i in range(len(valid)-1):
+		valid[i] = int(valid[i],16)
+		if valid[i] < 2**31:
+			valid[i] = valid[i]/1024 
+		else:
+			valid[i] = (valid[i]-2**32)/1024 
+		valid_new.append(valid[i])
+	return np.array(valid_new)
+
+
+valid0 = data_format(valid[:,0])
+valid1 = data_format(valid[:,1])
+valid2 = data_format(valid[:,2])
+valid3 = data_format(valid[:,3])
+valid4 = data_format(valid[:,4])
+valid5 = data_format(valid[:,5])
+
+base0 = data_format(base[:,0])
+base1 = data_format(base[:,1])
+base2 = data_format(base[:,2])
+base3 = data_format(base[:,3])
+base4 = data_format(base[:,4])
+base5 = data_format(base[:,5])
+
+diff0 = data_format(diff[:,0])
+diff1 = data_format(diff[:,1])
+diff2 = data_format(diff[:,2])
+diff3 = data_format(diff[:,3])
+diff4 = data_format(diff[:,4])
+diff5 = data_format(diff[:,5])
+
+def fit_degree(array_i,array_o):
+	ss_tot = np.sum((array_i - np.mean(array_i))**2)
+	ss_res = np.sum((array_i - array_o)**2)
+	degree = 1 - (ss_res/ss_tot)
+	return degree
+
+def polyfit(array_i,array_o,label):
+	p = np.polyfit(array_i,array_o,1)
+	z = np.poly1d(p)
+	print(z)
+	exp = []
+	exp = z(array_i)
+	#exp = polyval(p,array_i)
+	r_squared =  fit_degree(array_o,exp)
+	print("the relativity is %f" %(r_squared))
+	delta = array_o - exp
+
+	plt.figure('the fit plot of ' + label[0] + ' and ' + label[1])
+	plt.plot(array_i, '-o') 
+	plt.plot(array_o, '-o') 
+	plt.plot(exp, '-o') 
+	plt.legend([label[0],label[1],'exp'])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+
+	plt.figure('the fit delta of ' + label[0] + ' and ' + label[1])
+	plt.plot(delta, '-o') 
+	plt.legend(['the fit delta of ' + label[0] + ' and ' + label[1]])
+	plt.ylabel('Value')
+	plt.xlabel('Sample (N)')
+	plt.grid()
+
+# -----------------------------------------------------
+# plot data
+# -----------------------------------------------------
+# plt.rcParams['font.sans-serif']=['SimHei']
+# plt.rcParams['axes.unicode_minus'] = False
+# #matplotlib画图中中文显示会有问题，需要这两行设置默认字体
+print("The data is processing ...")
+
+colors1 = '#00CED1' #点的颜色
+colors2 = '#DC143C'
+
+#################################################################
+## Figuer 1
+#################################################################
+polyfit(valid4,valid0,['valid4','valid0'])
+polyfit(valid3,valid2,['valid3','valid2'])
+plt.show()
