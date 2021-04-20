@@ -1,0 +1,223 @@
+#!/bin/sh
+
+
+intn_init( ) {
+	PIN_INTN=17
+	if [ ! -d /sys/class/gpio/gpio${PIN_INTN}/ ]; then
+		echo export pin ${PIN_INTN}
+		echo ${PIN_INTN} > /sys/class/gpio/export
+	fi
+	
+	echo in > /sys/class/gpio/gpio${PIN_INTN}/direction
+}
+
+get_valid( ) {
+	#ADDR_VALID_SS0="0x02 0x10"
+	rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r4`
+	#echo $time,$rdata
+}
+
+get_valid1( ) {
+	ADDR_VALID_SS0="0x02 0x10"
+	ADDR_VALID_SS1="0x02 0x14"
+	ADDR_VALID_SS2="0x02 0x18"
+	ADDR_VALID_SS3="0x02 0x1C"
+
+	time=$(date "+%H:%M:%S")
+	rdata=`i2ctransfer -y 1 w2@0x12 $ADDR_VALID_SS0 r72 | sed -e 's/0x//g' -e 's/ //g' -e 's/.\{8\}/0x&,/g'`
+	echo $time,$rdata >> data_record.csv
+	echo $time,$rdata
+}
+
+aw9610x_regs_config( ){
+	i2ctransfer -y 1 w6@0x12 0xf0 0x08 0x00 0x00 0x00 0x02
+	echo The AW9610x enter into sleep mode !
+	`cp regs_cfg_aw9610x.txt ./tmp/cfg_adb.txt`
+	`sed -i -e 's/0x//g' -e 's/,//g' ./tmp/cfg_adb.txt`
+	`sed -i 's/../0x& /g' ./tmp/cfg_adb.txt`
+	cat ./tmp/cfg_adb.txt | while read line
+	do
+		echo $line
+		i2ctransfer -y 1 w6@0x12 ${line}
+	done
+	i2ctransfer -y 1 w6@0x12 0xf0 0x08 0x00 0x00 0x00 0x01
+	echo The AW9610x enter into active mode !
+}
+
+aw9610x_regs_read( ){
+	cp regs_cfg_aw9610x.txt ./tmp/regs_read_list.txt
+	sed -i -e 's/0x//g' -e 's/,.*$//g' ./tmp/regs_read_list.txt
+	`sed -i 's/../0x& /g' ./tmp/regs_read_list.txt`
+	cat ./tmp/regs_read_list.txt | while read line
+	do
+		rdata=`i2ctransfer -y 1 w2@0x12 ${line} r4 | sed 's/ 0x//g'`
+		addr=`echo ${line} | sed -e 's/ 0x//g'`
+		echo "Read: $addr,$rdata"
+	done
+}
+
+cfg_regs( ){
+	echo  -n "Do you want to config the register for AW9610X ? (y/n) "
+	read choice
+	if [ "${choice}" = "y" ]; then
+		echo "\n---------Start to config the registers for AW9610x----------\n"
+		aw9610x_regs_config
+		echo "\n---------Finish to config the registers for AW9610x---------\n"
+	else
+		echo "**Copy that, skip register config for AW9610x !\n"
+	fi
+}
+
+read_regs( ) {
+	echo  -n "Do you want to READ all the register configured for AW9610X ? (y/n) "
+	read choice
+	if [ "${choice}" = "y" ]; then
+		echo "\n---------Start to read the registers configured for AW9610x----------\n"
+		aw9610x_regs_read
+		echo "\n---------Finish to read the registers configured for AW9610x---------\n"
+	else
+		echo "**Copy that, skip read register configured for AW9610x !\n"
+	fi
+}
+
+get_data( ) {
+
+	intn_init
+
+	INTERVAL=5
+	pre_time=`expr $(date "+%s%N") / 1000000` #ms
+
+	time=$(date "+%Y%m%d%H%M%S")
+	time1=$(date "+%Y%m%d")
+	time2=$(date "+%H%M%S")
+
+	echo time,valid0,valid1,valid2,valid3,valid4,valid5,base0,base1,base2,base3,base4,base5,diff0,diff1,diff2,diff3,diff4,diff5, > data_record.csv
+	echo time,valid0,valid1,valid2,valid3,valid4,valid5,base0,base1,base2,base3,base4,base5,diff0,diff1,diff2,diff3,diff4,diff5,
+
+	while [ 1 = 1 ] 
+	do
+		get_valid1
+	done
+}
+
+sleep_mode( ){
+	i2ctransfer -y 1 w6@0x12 0xf0 0x08 0x00 0x00 0x00 0x02
+	echo "The aw96103 enters into sleep mode!"
+}
+
+active_mode( ){
+	i2ctransfer -y 1 w6@0x12 0xf0 0x08 0x00 0x00 0x00 0x01
+	echo "The aw96103 enters into active mode!"
+}
+
+re_cal( ){
+	rdata=`i2ctransfer -y 1 w2@0x12 0x00 0x00 r4 | awk -F ' ' '{print $4}'`
+	i2ctransfer -y 1 w6@0x12 0x00 0x00 0x00 0x00 0x3F $rdata
+	echo "The aw96103 re-calibrate is finish!"
+}
+
+timer(){
+	INTERVAL=5
+	pre_time=`expr $(date "+%s%N") / 1000000` #ms
+	#doing something here
+	while [ 1 = 1 ]
+	do
+		cur_time=`expr $(date "+%s%N") / 1000000`
+		delta=`expr $cur_time - $pre_time` 
+		if [ $delta -ge $INTERVAL ];then
+			#pre_tmp=`expr $pre_time + $INTERVAL`
+			pre_time=`expr $pre_time + $INTERVAL`
+			#pre_time=$cur_time
+			#$pre_time=`expr $pre_time + $INTERVAL` #shell do not support y=$y + x !!!
+			#doing something here
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			#echo $rdata
+			#echo $delta
+		fi
+	done
+}
+
+timer1(){
+	INTERVAL=100 # the average interval is INTERVAL/10
+	pre_time=`expr $(date "+%s%N") / 1000000` #ms
+	#doing something here
+	while [ 1 = 1 ]
+	do
+		cur_time=`expr $(date "+%s%N") / 1000000`
+		delta=`expr $cur_time - $pre_time` 
+		if [ $delta -ge $INTERVAL ];then
+			pre_tmp=`expr $pre_time + $INTERVAL`
+			pre_time=$pre_tmp
+			#pre_time=$cur_time
+			#$pre_time=`expr $pre_time + $INTERVAL` #shell do not support y=$y + x !!!
+			#doing something here
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			rdata=`i2ctransfer -y 1 w2@0x12 0x02 0x10 r8`
+			echo $rdata
+			echo $delta
+		fi
+	done
+}
+
+info( ){
+	echo "\n------------------------------------------------------------------------"
+	echo "Please input your selection : "
+	echo "    1. Input '1' or 'cfg_regs' to config all the registers of AW9610x."
+	echo "    2. Input '2' or 'read_regs' to read all the registers of AW9610x."
+	echo "    3. Input '3' or 'get_data' to obtain afe/valid/base/diff of AW9610x."
+	echo "    4. Input '4' or 'sleep' to enter sleep mode for AW9610x."
+	echo "    5. Input '5' or 'active' to enter active mode for AW9610x."
+	echo "    6. Input '6' or 're_cal' to re-calibrate the all CH for AW9610x."
+	echo "    7. Input '7' or 'timer' to doing the repeated thing for AW9610x."
+	echo "---------------------------------- --------------------------------------"
+}
+#########################################################################
+# Main
+#########################################################################
+
+while [ 1 = 1 ]
+do
+
+	info
+	echo -n "Please input: "
+	read choice
+
+	case $choice in
+	1 | "cfg_regs")
+		cfg_regs
+		;;
+	2 | "read_regs")
+		read_regs
+		;;
+	3 | "get_data")
+		get_data
+		;;
+	4 | "sleep")
+		sleep_mode
+		;;
+	5 | "active")
+		active_mode
+		;;
+	6 | "re_cal")
+		re_cal
+		;;
+	7)
+		timer
+		;;
+	8)
+		timer1
+		;;
+	*)
+		;;
+	esac
+
+done
+
